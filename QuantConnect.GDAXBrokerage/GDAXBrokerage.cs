@@ -203,7 +203,16 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public override bool UpdateOrder(Order order)
         {
-            throw new NotSupportedException("GDAXBrokerage.UpdateOrder: Order update not supported. Please cancel and re-create.");
+            if (!CanSubscribe(order.Symbol))
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1,
+                    $"Symbol is not supported {order.Symbol}"));
+                return false;
+            }
+
+            _coinbaseApi.EditOrder(order);
+
+            return true;
         }
 
         /// <summary>

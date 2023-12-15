@@ -25,6 +25,8 @@ using QuantConnect.Tests.Common.Securities;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.CoinbaseBrokerage.Api;
 using QuantConnect.Brokerages.GDAX;
+using QuantConnect.Logging;
+using System.Threading;
 
 namespace QuantConnect.Tests.Brokerages.GDAX
 {
@@ -155,6 +157,55 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         public override void LongFromShort(OrderTestParameters parameters)
         {
             base.LongFromShort(parameters);
+        }
+
+        [Test, TestCaseSource(nameof(OrderParameters))]
+        public void UpdateOrder(OrderTestParameters parameters)
+        {
+            var submittedStatusEvent = new AutoResetEvent(false);
+            var UpdateSubmittedStatusEvent = new AutoResetEvent(false);
+
+            Brokerage.OrdersStatusChanged += (_, orderEvents) =>
+            {
+                var orderEvent = orderEvents[0];
+                // no matter what, every order should fire at least one of these
+                if (orderEvent.Status == OrderStatus.Submitted || orderEvent.Status == OrderStatus.Invalid)
+                {
+                    Log.Trace("");
+                    Log.Trace("SUBMITTED: " + orderEvent);
+                    Log.Trace("");
+                    submittedStatusEvent.Set();
+                }
+
+                if (orderEvent.Status == OrderStatus.UpdateSubmitted)
+                {
+                    Log.Trace("");
+                    Log.Trace("UPDATED: " + orderEvent);
+                    Log.Trace("");
+                    submittedStatusEvent.Set();
+
+                    UpdateSubmittedStatusEvent.Set();
+                }
+            };
+
+            var order = parameters.CreateLongOrder(-GetDefaultQuantity());
+
+            OrderProvider.Add(order);
+            if (!Brokerage.PlaceOrder(order))
+            {
+                Assert.Fail("Brokerage failed to place the order: " + order);
+            }
+
+            Assert.IsTrue(submittedStatusEvent.WaitOne(TimeSpan.FromSeconds(10)));
+
+            order.ApplyUpdateOrderRequest(new UpdateOrderRequest(DateTime.UtcNow, order.Id, new UpdateOrderFields() { Quantity = 0.00005m }));
+
+            if (!Brokerage.UpdateOrder(order))
+            {
+                Assert.Fail("Brokerage failed to place the order: " + order);
+            }
+
+            Assert.IsTrue(UpdateSubmittedStatusEvent.WaitOne(TimeSpan.FromSeconds(10)));
         }
 
         [TestCase("BTCUSDC")]

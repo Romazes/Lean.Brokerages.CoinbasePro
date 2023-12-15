@@ -169,6 +169,33 @@ public class CoinbaseApi : IDisposable
         return JsonConvert.DeserializeObject<CoinbaseProductCandles>(response.Content).Candles.Reverse();
     }
 
+    public void EditOrder(Order leanOrder)
+    {
+        if (leanOrder.TimeInForce is not Orders.TimeInForces.GoodTilCanceledTimeInForce)
+            return;
+
+        var request = new RestRequest($"{_apiPrefix}/brokerage/orders/edit", Method.POST);
+
+        var newPrice = (leanOrder as LimitOrder)?.LimitPrice ??
+                    (leanOrder as StopLimitOrder)?.LimitPrice ?? 0;
+
+        request.AddJsonBody(
+            JsonConvert.SerializeObject(new CoinbaseEditOrderRequest(leanOrder.BrokerId.Single(), newPrice, Math.Abs(leanOrder.Quantity)),
+            _jsonSerializerSettings));
+
+        var response = _apiClient.ExecuteRequest(request);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var res = JsonConvert.DeserializeObject<ErrorResponse>(response.Content);
+            var d = new CoinbaseCreateOrderResponse(false, FailureCreateOrderReason.UNKNOWN_FAILURE_REASON, "", null, res, null);
+            return;
+        }
+
+        // return JsonConvert.DeserializeObject<CoinbaseCreateOrderResponse>(response.Content);
+        return;
+    }
+
     public CoinbaseCreateOrderResponse CreateOrder(Order leanOrder)
     {
         var placeOrderRequest = CreateRequest(leanOrder);
