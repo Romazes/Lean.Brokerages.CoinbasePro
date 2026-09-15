@@ -29,6 +29,7 @@ using QuantConnect.Logging;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Interfaces;
+using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Orders.Fees;
 using System.Collections.Generic;
 using QuantConnect.Configuration;
@@ -168,6 +169,8 @@ namespace QuantConnect.Brokerages.Coinbase
                 SubscribeImpl = (symbols, _) => SubscribeSymbolsOnDataChannels(symbols.ToList()),
                 UnsubscribeImpl = (symbols, _) => Unsubscribe(symbols)
             };
+
+            DeploymentDetailsHelper.Add("coinbase-api-name", name);
         }
 
         #region IBrokerage
